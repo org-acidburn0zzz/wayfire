@@ -35,5 +35,12 @@
 			<_long>Disallows independently moving dialogues.</_long>
 			<default>false</default>
 		</option>
+    <option name="workspace_switch_after" type="int">
+      <_short>Switch workspace after</_short>
+      <_long>Switch workspace when the mouse stays on the output edge for the
+        given duration in milliseconds (-1 to disable).</_long>
+      <default>0</default>
+      <min>-1</min>
+    </option>
 	</plugin>
 </wayfire>

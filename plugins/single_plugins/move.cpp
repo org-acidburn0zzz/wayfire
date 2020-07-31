@@ -7,6 +7,7 @@
 #include <wayfire/render-manager.hpp>
 #include <wayfire/compositor-view.hpp>
 #include <wayfire/output-layout.hpp>
+#include <wayfire/plugins/vswitch.hpp>
 
 #include <cmath>
 #include <linux/input.h>
@@ -70,6 +71,7 @@ class wayfire_move : public wf::plugin_interface_t
     wf::option_wrapper_t<bool> enable_snap{"move/enable_snap"};
     wf::option_wrapper_t<bool> join_views{"move/join_views"};
     wf::option_wrapper_t<int> snap_threshold{"move/snap_threshold"};
+    wf::option_wrapper_t<int> workspace_switch_after{"move/workspace_switch_after"};
     wf::option_wrapper_t<wf::buttonbinding_t> activate_button{"move/activate"};
 
     bool is_using_touch;
@@ -80,6 +82,10 @@ class wayfire_move : public wf::plugin_interface_t
         nonstd::observer_ptr<wf::preview_indication_view_t> preview;
         int slot_id = 0;
     } slot;
+
+
+    wf::wl_timer workspace_switch_timer;
+    std::unique_ptr<wf::vswitch::workspace_switch_t> workspace_switch;
 
 #define MOVE_HELPER view->get_data<wf::move_snap_helper_t>()
 
@@ -178,12 +184,22 @@ class wayfire_move : public wf::plugin_interface_t
 
         view_destroyed = [=] (wf::signal_data_t *data)
         {
+            if (get_signaled_view(data) == workspace_switch->get_overlay_view())
+            {
+                /* We need to check separately here, because the overlay view
+                 * might be destroyed after the button has been released. */
+                workspace_switch->set_overlay_view(nullptr);
+            }
+
             if (get_signaled_view(data) == view)
             {
                 input_pressed(WLR_BUTTON_RELEASED, true);
             }
         };
         output->connect_signal("view-disappeared", &view_destroyed);
+
+        workspace_switch =
+            std::make_unique<wf::vswitch::workspace_switch_t>(output);
     }
 
     void move_requested(wf::signal_data_t *data)
@@ -376,6 +392,80 @@ class wayfire_move : public wf::plugin_interface_t
         return slot;
     }
 
+    void update_workspace_switch_timeout(int slot_id)
+    {
+        if ((workspace_switch_after == -1) || (slot_id == 0))
+        {
+            workspace_switch_timer.disconnect();
+
+            return;
+        }
+
+        int dx = 0, dy = 0;
+        if (slot_id >= 7)
+        {
+            dy = -1;
+        }
+
+        if (slot_id <= 3)
+        {
+            dy = 1;
+        }
+
+        if (slot_id % 3 == 1)
+        {
+            dx = -1;
+        }
+
+        if (slot_id % 3 == 0)
+        {
+            dx = 1;
+        }
+
+        if ((dx == 0) && (dy == 0))
+        {
+            workspace_switch_timer.disconnect();
+
+            return;
+        }
+
+        wf::point_t cws = output->workspace->get_current_workspace();
+        if (workspace_switch->is_running())
+        {
+            cws = workspace_switch->get_target_workspace();
+        }
+
+        wf::point_t tws = {cws.x + dx, cws.y + dy};
+        wf::dimensions_t ws_dim = output->workspace->get_workspace_grid_size();
+        wf::geometry_t possible = {
+            0, 0, ws_dim.width, ws_dim.height
+        };
+
+        /* Outside of workspace grid */
+        if (!(possible & tws))
+        {
+            workspace_switch_timer.disconnect();
+
+            return;
+        }
+
+        workspace_switch_timer.set_timeout(workspace_switch_after, [this, tws] ()
+        {
+            start_workspace_switch(tws);
+        });
+    }
+
+    void start_workspace_switch(wf::point_t target)
+    {
+        if (!workspace_switch->is_running())
+        {
+            workspace_switch->start_switch();
+            workspace_switch->set_overlay_view(view);
+        }
+
+        workspace_switch->set_target_workspace(target);
+    }
+
     void update_slot(int new_slot_id)
     {
         /* No changes in the slot, just return */
@@ -420,6 +510,8 @@ class wayfire_move : public wf::plugin_interface_t
             preview->set_target_geometry(query.out_geometry, 1);
             slot.preview = nonstd::make_observer(preview);
         }
+
+        update_workspace_switch_timeout(new_slot_id);
     }
 
     /* Returns the currently used input coordinates in global compositor space */

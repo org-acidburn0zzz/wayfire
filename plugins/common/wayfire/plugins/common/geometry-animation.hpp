@@ -1,3 +1,4 @@
+#pragma once
 #include <wayfire/option-wrapper.hpp>
 #include <wayfire/util/duration.hpp>
 #include <cmath>
