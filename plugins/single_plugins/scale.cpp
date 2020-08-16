@@ -188,71 +188,49 @@ class wayfire_scale : public wf::plugin_interface_t
             get_current_workspace_views().size();
     }
 
-    wf::activator_callback toggle_cb = [=] (wf::activator_source_t, uint32_t)
+    bool handle_toggle(bool want_all_workspaces)
     {
-        if (active)
+        if (active && (all_same_as_current_workspace_views() ||
+                       (want_all_workspaces == this->all_workspaces)))
         {
-            if (all_workspaces)
-            {
-                all_workspaces = false;
-                if (all_same_as_current_workspace_views())
-                {
-                    deactivate();
-
-                    return true;
-                }
-
-                all_workspaces_option_changed();
-            } else
-            {
-                deactivate();
-            }
-        } else
-        {
-            all_workspaces = false;
-            if (!activate())
-            {
-                return false;
-            }
+            deactivate();
+            return true;
         }
 
-        output->render->schedule_redraw();
+        this->all_workspaces = want_all_workspaces;
+        if (active)
+        {
+            all_workspaces_option_changed();
+            return true;
+        } else
+        {
+            return activate();
+        }
+    }
 
-        return true;
+
+    wf::activator_callback toggle_cb = [=] (wf::activator_source_t, uint32_t)
+    {
+        if (handle_toggle(false))
+        {
+            output->render->schedule_redraw();
+
+            return true;
+        }
+
+        return false;
     };
 
     wf::activator_callback toggle_all_cb = [=] (wf::activator_source_t, uint32_t)
     {
-        if (active)
+        if (handle_toggle(true))
         {
-            if (!all_workspaces)
-            {
-                all_workspaces = true;
-                if (all_same_as_current_workspace_views())
-                {
-                    deactivate();
+            output->render->schedule_redraw();
 
-                    return true;
-                }
-
-                all_workspaces_option_changed();
-            } else
-            {
-                select_view(last_focused_view);
-                deactivate();
-            }
-        } else
-        {
-            all_workspaces = true;
-            if (!activate())
-            {
-                return false;
-            }
+            return true;
         }
 
-        output->render->schedule_redraw();
-
-        return true;
+        return false;
     };
 
     void connect_button_signal()
