@@ -154,10 +154,9 @@ class wayfire_scale : public wf::plugin_interface_t
     {
         for (auto& view : views)
         {
-            add_transformer(view);
-            for (auto& child : view->children)
+            for (auto& toplevel : view->enumerate_views())
             {
-                add_transformer(child);
+                add_transformer(toplevel);
             }
         }
     }
@@ -169,20 +168,16 @@ class wayfire_scale : public wf::plugin_interface_t
             return;
         }
 
-        if (view->get_transformer(transformer_name))
-        {
-            view->pop_transformer(transformer_name);
-        }
+        view->pop_transformer(transformer_name);
     }
 
     void remove_transformers()
     {
         for (auto& e : scale_data)
         {
-            pop_transformer(e.first);
-            for (auto& child : e.first->children)
+            for (auto& toplevel : e.first->enumerate_views(false))
             {
-                pop_transformer(child);
+                pop_transformer(toplevel);
             }
         }
     }
