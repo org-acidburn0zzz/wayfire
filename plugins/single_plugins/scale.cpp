@@ -184,13 +184,8 @@ class wayfire_scale : public wf::plugin_interface_t
 
     bool all_same_as_current_workspace_views()
     {
-        auto all_workspace_views     = get_all_workspace_views();
-        auto current_workspace_views = get_current_workspace_views();
-
-        std::sort(all_workspace_views.begin(), all_workspace_views.end());
-        std::sort(current_workspace_views.begin(), current_workspace_views.end());
-
-        return all_workspace_views == current_workspace_views;
+        return get_all_workspace_views().size() ==
+            get_current_workspace_views().size();
     }
 
     wf::activator_callback toggle_cb = [=] (wf::activator_source_t, uint32_t)
