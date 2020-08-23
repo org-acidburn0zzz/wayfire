@@ -1177,7 +1177,7 @@ class wayfire_scale : public wf::plugin_interface_t
                         v = v->parent;
                     }
 
-                    if (v == view)
+                    if (!v || (v == view) || v->minimized || !v->is_mapped())
                     {
                         return;
                     }
