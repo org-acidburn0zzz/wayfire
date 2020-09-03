@@ -371,7 +371,6 @@ void wf::LogicalPointer::send_button(wlr_event_pointer_button *ev,
 {
     if (input->active_grab)
     {
-        LOGI("send button ", ev->button);
         if (input->active_grab->callbacks.pointer.button)
         {
             input->active_grab->callbacks.pointer.button(ev->button, ev->state);
