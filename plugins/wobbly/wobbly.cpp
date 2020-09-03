@@ -742,14 +742,19 @@ class wf_wobbly : public wf::view_transformer_t
         this->state = std::move(next_state);
     }
 
-    void start_grab(int x, int y)
+    void start_grab(wf::point_t grab)
     {
-        update_wobbly_state(true, {x, y}, false);
+        update_wobbly_state(true, grab, false);
     }
 
     void move(wf::point_t point)
     {
         state->handle_grab_move(point);
+    }
+
+    void translate(wf::point_t delta)
+    {
+        state->translate_model(delta.x, delta.y);
     }
 
     void end_grab()
@@ -831,12 +836,17 @@ class wayfire_wobbly : public wf::plugin_interface_t
 
         if (data->events & WOBBLY_EVENT_GRAB)
         {
-            wobbly->start_grab(data->grab_x, data->grab_y);
+            wobbly->start_grab(data->pos);
         }
 
         if (data->events & WOBBLY_EVENT_MOVE)
         {
-            wobbly->move({data->grab_x, data->grab_y});
+            wobbly->move(data->pos);
+        }
+
+        if (data->events & WOBBLY_EVENT_TRANSLATE)
+        {
+            wobbly->translate(data->pos);
         }
 
         if (data->events & WOBBLY_EVENT_END)

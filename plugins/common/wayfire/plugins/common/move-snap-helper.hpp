@@ -108,6 +108,27 @@ class move_snap_helper_t : public wf::custom_data_t
     }
 
     /**
+     * Handle a new input event which is a motion of the grabbing point, for ex.
+     * cursor or touch point was moved.
+     *
+     * In contrast to handle_motion, this event causes wobbly to directly "jump"
+     * to the new position.
+     *
+     * @param to The new grab point position, in output-local coordinates.
+     */
+    virtual void handle_grab_translated(wf::point_t to)
+    {
+        wf::point_t delta = to - this->last_grabbing_position;
+        for (auto v : enum_views(view))
+        {
+            translate_wobbly(v, delta);
+        }
+
+        this->last_grabbing_position = to;
+        adjust_around_grab();
+    }
+
+    /**
      * The input point was released (mouse unclicked, finger lifted, etc.)
      * This will also release the wobbly grab.
      */
@@ -177,7 +198,7 @@ void ensure_move_helper_at(wayfire_view view, wf::point_t point)
     auto helper = view->get_data<wf::move_snap_helper_t>();
     if (helper != nullptr)
     {
-        helper->handle_motion(point);
+        helper->handle_grab_translated(point);
     } else
     {
         view->store_data(std::make_unique<wf::move_snap_helper_t>(view, point));
