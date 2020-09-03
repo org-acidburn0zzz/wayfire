@@ -291,7 +291,7 @@ class wayfire_move : public wf::plugin_interface_t
     bool initiate(wayfire_view view)
     {
         view = get_target_view(view);
-        if (!can_move_view(view) || (view && view->get_output() != output))
+        if (!can_move_view(view) || (view && (view->get_output() != output)))
         {
             return false;
         }
