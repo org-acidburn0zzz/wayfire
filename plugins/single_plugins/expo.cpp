@@ -1,6 +1,8 @@
 #include <wayfire/plugin.hpp>
 #include <wayfire/output.hpp>
 #include <wayfire/core.hpp>
+#include <wayfire/output-layout.hpp>
+#include <wayfire/debug.hpp>
 
 #include <wayfire/plugins/common/view-change-viewport-signal.hpp>
 #include <wayfire/plugins/common/workspace-wall.hpp>
@@ -198,7 +200,55 @@ class wayfire_expo : public wf::plugin_interface_t
 
         output->connect_signal("view-detached", &view_removed);
         output->connect_signal("view-disappeared", &view_removed);
+
+        output->connect_signal("view-move-check", &on_view_check_move);
+        output->connect_signal("view-move-request", &on_move_request);
     }
+
+    wf::signal_connection_t on_move_request = [=] (wf::signal_data_t *data)
+    {
+        auto view = get_signaled_view(data);
+        if (!can_start_move(view))
+        {
+            return;
+        }
+
+        auto input = wf::get_core().get_touch_position(0);
+        if (std::isnan(input.x) || std::isnan(input.y))
+        {
+            input = wf::get_core().get_cursor_position();
+        }
+
+        auto og = output->get_layout_geometry();
+        input.x -= og.x;
+        input.y -= og.y;
+
+        // assume input was pressed, otherwise, move request doesn't make sense
+        this->state.button_pressed = true;
+        this->input_grab_origin = offscreen_point;
+
+        start_move(view, {(int)input.x, (int)input.y});
+    };
+
+    /**
+     * Check whether we can start moving the view, i.e if expo is active and
+     * not already moving a view
+     */
+    bool can_start_move(wayfire_view view)
+    {
+        return view != nullptr &&
+            output->is_plugin_active(grab_interface->name) &&
+            this->moving_view == nullptr;
+    }
+
+    wf::signal_connection_t on_view_check_move = [=] (wf::signal_data_t *data)
+    {
+        auto ev = static_cast<wf::view_move_check_signal*>(data);
+        if (!ev->can_continue && can_start_move(ev->view))
+        {
+            ev->can_continue = true;
+        }
+    };
 
     bool activate()
     {
@@ -331,7 +381,7 @@ class wayfire_expo : public wf::plugin_interface_t
 
         bool first_click = (input_grab_origin != offscreen_point);
         /* As input coordinates are always positive, this will ensure that any
-         * subsequent motion eveennts while grabbed are allowed */
+         * subsequent motion events while grabbed are allowed */
         input_grab_origin = offscreen_point;
 
         if (!zoom_animation.running() && first_click)
@@ -342,6 +392,19 @@ class wayfire_expo : public wf::plugin_interface_t
 
         if (moving_view)
         {
+            auto og = output->get_layout_geometry();
+            auto target_output = wf::get_core().output_layout->get_output_at(
+                og.x + to.x, og.y + to.y);
+            if (target_output != output)
+            {
+                /** First, reset moving view so that we don't remove its snap
+                 * helper when the output is changed. */
+                auto moving_view_copy = moving_view;
+                this->moving_view = nullptr;
+                start_move_on_output(moving_view_copy, target_output);
+                return;
+            }
+
             int global_x = to.x, global_y = to.y;
             input_coordinates_to_global_coordinates(global_x, global_y);
 
@@ -374,9 +437,8 @@ class wayfire_expo : public wf::plugin_interface_t
 
         output->workspace->bring_to_front(moving_view);
 
-        moving_view->store_data(
-            std::make_unique<wf::move_snap_helper_t>(moving_view,
-                input_coordinates_to_output_local_coordinates(grab)));
+        wf::ensure_move_helper_at(moving_view,
+            input_coordinates_to_output_local_coordinates(grab));
 
         wf::get_core().set_cursor("grabbing");
     }
