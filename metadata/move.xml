@@ -39,7 +39,7 @@
       <_short>Switch workspace after</_short>
       <_long>Switch workspace when the mouse stays on the output edge for the
         given duration in milliseconds (-1 to disable).</_long>
-      <default>0</default>
+      <default>-1</default>
       <min>-1</min>
     </option>
 	</plugin>

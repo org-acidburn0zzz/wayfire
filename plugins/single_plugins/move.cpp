@@ -200,6 +200,7 @@ class wayfire_move : public wf::plugin_interface_t
 
         workspace_switch =
             std::make_unique<wf::vswitch::workspace_switch_t>(output);
+        output->connect_signal("view-move-check", &on_view_check_move);
     }
 
     void move_requested(wf::signal_data_t *data)
@@ -223,30 +224,23 @@ class wayfire_move : public wf::plugin_interface_t
         initiate(view);
     }
 
-    bool initiate(wayfire_view view)
+    wf::signal_connection_t on_view_check_move = [=] (wf::signal_data_t *data)
     {
-        if (!view || !view->is_mapped())
+        auto ev = static_cast<wf::view_move_check_signal*>(data);
+        if (!ev->can_continue && can_move_view(ev->view))
         {
-            return false;
+            ev->can_continue = true;
         }
+    };
 
-        while (view->parent && join_views)
-        {
-            view = view->parent;
-        }
-
-        auto current_ws_impl =
-            output->workspace->get_workspace_implementation();
-        if (!current_ws_impl->view_movable(view))
-        {
-            return false;
-        }
-
-        if (view->get_output() != output)
-        {
-            return false;
-        }
-
+    /**
+     * Calculate plugin activation flags for the view.
+     *
+     * Activation flags ignore input inhibitors if the view is in the desktop
+     * widget layer (i.e OSKs)
+     */
+    uint32_t get_act_flags(wayfire_view view)
+    {
         uint32_t view_layer = output->workspace->get_view_layer(view);
         /* Allow moving an on-screen keyboard while screen is locked */
         bool ignore_inhibit = view_layer == wf::LAYER_DESKTOP_WIDGET;
@@ -256,7 +250,53 @@ class wayfire_move : public wf::plugin_interface_t
             act_flags |= wf::PLUGIN_ACTIVATION_IGNORE_INHIBIT;
         }
 
-        if (!output->activate_plugin(grab_interface, act_flags))
+        return act_flags;
+    }
+
+    /**
+     * Calculate the view which is the actual target of this move operation.
+     *
+     * Usually, this is the view itself or its topmost parent if the join_views
+     * option is set.
+     */
+    wayfire_view get_target_view(wayfire_view view)
+    {
+        while (view && view->parent && join_views)
+        {
+            view = view->parent;
+        }
+
+        return view;
+    }
+
+    bool can_move_view(wayfire_view view)
+    {
+        if (!view || !view->is_mapped())
+        {
+            return false;
+        }
+
+        view = get_target_view(view);
+
+        auto current_ws_impl =
+            output->workspace->get_workspace_implementation();
+        if (!current_ws_impl->view_movable(view))
+        {
+            return false;
+        }
+
+        return output->can_activate_plugin(grab_interface, get_act_flags(view));
+    }
+
+    bool initiate(wayfire_view view)
+    {
+        view = get_target_view(view);
+        if (!can_move_view(view) || (view && view->get_output() != output))
+        {
+            return false;
+        }
+
+        if (!output->activate_plugin(grab_interface, get_act_flags(view)))
         {
             return false;
         }
@@ -268,8 +308,7 @@ class wayfire_move : public wf::plugin_interface_t
             return false;
         }
 
-        view->store_data(std::make_unique<wf::move_snap_helper_t>(
-            view, get_input_coords()));
+        ensure_move_helper_at(view, get_input_coords());
 
         output->focus_view(view, true);
         if (enable_snap)
@@ -549,29 +588,6 @@ class wayfire_move : public wf::plugin_interface_t
         return coords;
     }
 
-    /* Moves the view to another output and sends a move request */
-    void move_to_output(wf::output_t *new_output)
-    {
-        wf::view_move_request_signal req;
-        req.view = view;
-
-        auto old_g = output->get_layout_geometry();
-        auto new_g = new_output->get_layout_geometry();
-        auto wm_g  = view->get_wm_geometry();
-
-        int dx = old_g.x - new_g.x;
-        int dy = old_g.y - new_g.y;
-
-        /* First erase the move snap helper, so that we can set the
-         * correct position on the other output. */
-        view->erase_data<wf::move_snap_helper_t>();
-        view->move(wm_g.x + dx, wm_g.y + dy);
-        wf::get_core().move_view_to_output(view, new_output, false);
-        wf::get_core().focus_output(new_output);
-
-        new_output->emit_signal("view-move-request", &req);
-    }
-
     struct wf_move_output_state : public wf::custom_data_t
     {
         nonstd::observer_ptr<wf_move_mirror_view> view;
@@ -676,7 +692,10 @@ class wayfire_move : public wf::plugin_interface_t
         {
             /* The move plugin on the next output will create new mirror views */
             delete_mirror_views(false);
-            move_to_output(target_output);
+            if (!wf::start_move_on_output(view, target_output))
+            {
+                input_pressed(WLR_BUTTON_RELEASED, false);
+            }
 
             return;
         }

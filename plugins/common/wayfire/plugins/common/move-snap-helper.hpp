@@ -4,6 +4,7 @@
 #include <wayfire/core.hpp>
 #include <wayfire/option-wrapper.hpp>
 #include <wayfire/plugins/wobbly/wobbly-signal.hpp>
+#include <wayfire/util/log.hpp>
 
 namespace wf
 {
@@ -14,8 +15,6 @@ namespace wf
  * 1. Interaction with the wobbly plugin
  * 2. Support for locking tiled views in-place until a certain threshold
  * 3. Ensuring view is grabbed at the correct place
- *
- * The view is supposed to stay in the same output while operating.
  */
 class move_snap_helper_t : public wf::custom_data_t
 {
@@ -62,6 +61,12 @@ class move_snap_helper_t : public wf::custom_data_t
         view->connect_signal("geometry-changed", &view_geometry_changed);
     }
 
+    /**
+     * Destroy the move snap helper.
+     * NB: The destructor will not release the wobbly grab if input has not been
+     *   released yet! This is useful if the wobbly grab is to be "transferred"
+     *   to another plugin.
+     */
     virtual ~move_snap_helper_t()
     {
         view->set_moving(false);
@@ -103,6 +108,7 @@ class move_snap_helper_t : public wf::custom_data_t
 
     /**
      * The input point was released (mouse unclicked, finger lifted, etc.)
+     * This will also release the wobbly grab.
      */
     virtual void handle_input_released()
     {
@@ -160,4 +166,55 @@ class move_snap_helper_t : public wf::custom_data_t
         adjust_around_grab();
     };
 };
+
+/**
+ * Add a move helper to the view if not already present, otherwise, move the
+ * grab to the given point.
+ */
+void ensure_move_helper_at(wayfire_view view, wf::point_t point)
+{
+    auto helper = view->get_data<wf::move_snap_helper_t>();
+    if (view->get_data<wf::move_snap_helper_t>())
+    {
+        helper->handle_motion(point);
+    } else
+    {
+        view->store_data(std::make_unique<wf::move_snap_helper_t>(view, point));
+    }
+}
+
+/**
+ * name: view-move-check
+ * on: output
+ * when: A plugin can emit this signal on an output to check whether there is a
+ *   plugin on that output which can continue an interactive move operation.
+ */
+struct view_move_check_signal : public _view_signal
+{
+    /** A plugin should set this to true if it can continue a move operation. */
+    bool can_continue = false;
+};
+
+/**
+ * Start an interactive move on another output.
+ * Precondition: the view is being moved with the snap helper.
+ *
+ * @return Whether the move was started on the other output
+ */
+bool start_move_on_output(wayfire_view view, wf::output_t *output)
+{
+    view_move_check_signal check;
+    check.view = view;
+    output->emit_signal("view-move-check", &check);
+    if (!check.can_continue)
+    {
+        return false;
+    }
+
+    wf::get_core().move_view_to_output(view, output, false);
+    wf::get_core().focus_output(output);
+    view->move_request();
+
+    return true;
+}
 }
