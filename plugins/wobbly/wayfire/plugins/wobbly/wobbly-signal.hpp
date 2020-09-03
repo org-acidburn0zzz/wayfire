@@ -36,7 +36,7 @@ inline void start_wobbly(wayfire_view view, int grab_x, int grab_y)
     wobbly_signal sig;
     sig.view   = view;
     sig.events = WOBBLY_EVENT_GRAB;
-    sig.pos = {grab_x, grab_y};
+    sig.pos    = {grab_x, grab_y};
 
     view->get_output()->emit_signal("wobbly-event", &sig);
 }
@@ -60,7 +60,7 @@ inline void move_wobbly(wayfire_view view, int grab_x, int grab_y)
     wobbly_signal sig;
     sig.view   = view;
     sig.events = WOBBLY_EVENT_MOVE;
-    sig.pos = {grab_x, grab_y};
+    sig.pos    = {grab_x, grab_y};
     view->get_output()->emit_signal("wobbly-event", &sig);
 }
 
@@ -85,8 +85,8 @@ inline void activate_wobbly(wayfire_view view)
 inline void translate_wobbly(wayfire_view view, wf::point_t delta)
 {
     wobbly_signal sig;
-    sig.view = view;
+    sig.view   = view;
     sig.events = WOBBLY_EVENT_TRANSLATE;
-    sig.pos = delta;
+    sig.pos    = delta;
     view->get_output()->emit_signal("wobbly-event", &sig);
 }
