@@ -5,6 +5,7 @@
 #include <wayfire/option-wrapper.hpp>
 #include <wayfire/plugins/wobbly/wobbly-signal.hpp>
 #include <wayfire/util/log.hpp>
+#include <wayfire/debug.hpp>
 
 namespace wf
 {
@@ -174,7 +175,7 @@ class move_snap_helper_t : public wf::custom_data_t
 void ensure_move_helper_at(wayfire_view view, wf::point_t point)
 {
     auto helper = view->get_data<wf::move_snap_helper_t>();
-    if (view->get_data<wf::move_snap_helper_t>())
+    if (helper != nullptr)
     {
         helper->handle_motion(point);
     } else
@@ -196,25 +197,25 @@ struct view_move_check_signal : public _view_signal
 };
 
 /**
- * Start an interactive move on another output.
- * Precondition: the view is being moved with the snap helper.
- *
- * @return Whether the move was started on the other output
+ * Check whether we can start an interactive move on the other output.
  */
-bool start_move_on_output(wayfire_view view, wf::output_t *output)
+bool can_start_move_on_output(wayfire_view view, wf::output_t *output)
 {
     view_move_check_signal check;
     check.view = view;
     output->emit_signal("view-move-check", &check);
-    if (!check.can_continue)
-    {
-        return false;
-    }
 
+    return check.can_continue;
+}
+
+/**
+ * Start an interactive move on another output.
+ * Precondition: the view is being moved with the snap helper.
+ */
+void start_move_on_output(wayfire_view view, wf::output_t *output)
+{
     wf::get_core().move_view_to_output(view, output, false);
     wf::get_core().focus_output(output);
     view->move_request();
-
-    return true;
 }
 }

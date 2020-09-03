@@ -323,6 +323,13 @@ class wayfire_move : public wf::plugin_interface_t
         return true;
     }
 
+    void deactivate()
+    {
+        grab_interface->ungrab();
+        output->deactivate_plugin(grab_interface);
+        output->render->set_redraw_always(false);
+    }
+
     void input_pressed(uint32_t state, bool view_destroyed)
     {
         if (state != WLR_BUTTON_RELEASED)
@@ -330,9 +337,7 @@ class wayfire_move : public wf::plugin_interface_t
             return;
         }
 
-        grab_interface->ungrab();
-        output->deactivate_plugin(grab_interface);
-        output->render->set_redraw_always(false);
+        deactivate();
 
         /* The view was moved to another output or was destroyed,
          * we don't have to do anything more */
@@ -692,7 +697,16 @@ class wayfire_move : public wf::plugin_interface_t
         {
             /* The move plugin on the next output will create new mirror views */
             delete_mirror_views(false);
-            if (!wf::start_move_on_output(view, target_output))
+
+            if (wf::can_start_move_on_output(view, target_output))
+            {
+                /** First, reset moving view so that we don't remove its snap
+                 * helper when the output is changed. */
+                deactivate();
+                auto view_copy = this->view;
+                this->view = nullptr;
+                wf::start_move_on_output(view_copy, target_output);
+            } else
             {
                 input_pressed(WLR_BUTTON_RELEASED, false);
             }
