@@ -13,7 +13,7 @@ extern "C"
 #include <wlr/types/wlr_xcursor_manager.h>
 }
 
-#include "../wobbly/wobbly-signal.hpp"
+#include <wayfire/plugins/wobbly/wobbly-signal.hpp>
 
 class wayfire_resize : public wf::plugin_interface_t
 {

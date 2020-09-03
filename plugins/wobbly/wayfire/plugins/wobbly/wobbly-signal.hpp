@@ -1,6 +1,4 @@
-#ifndef WOBBLY_SIGNAL_HPP
-#define WOBBLY_SIGNAL_HPP
-
+#pragma once
 #include <wayfire/signal-definitions.hpp>
 
 enum wobbly_event
@@ -11,14 +9,13 @@ enum wobbly_event
     WOBBLY_EVENT_ACTIVATE = (1 << 3),
 };
 
-enum wobbly_corner
-{
-    WOBBLY_CORNER_TL = 0,
-    WOBBLY_CORNER_TR = 1,
-    WOBBLY_CORNER_BL = 2,
-    WOBBLY_CORNER_BR = 3,
-};
-
+/**
+ * name: wobbly-event
+ * on: output
+ * when: This signal is used to control(start/stop/update) the wobbly state
+ *   for a view. Note that plugins usually would use the helper functions below,
+ *   instead of emitting this signal directly.
+ */
 struct wobbly_signal : public wf::_view_signal
 {
     wobbly_event events;
@@ -77,5 +74,3 @@ inline void activate_wobbly(wayfire_view view)
         view->get_output()->emit_signal("wobbly-event", &sig);
     }
 }
-
-#endif /* end of include guard: WOBBLY_SIGNAL_HPP */

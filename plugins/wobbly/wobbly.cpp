@@ -10,7 +10,7 @@ extern "C"
 #include "wobbly.h"
 }
 
-#include "wobbly-signal.hpp"
+#include "wayfire/plugins/wobbly/wobbly-signal.hpp"
 
 namespace wobbly_graphics
 {

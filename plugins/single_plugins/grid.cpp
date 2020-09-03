@@ -11,7 +11,7 @@
 #include <wayfire/plugins/common/geometry-animation.hpp>
 
 #include "snap_signal.hpp"
-#include "../wobbly/wobbly-signal.hpp"
+#include <wayfire/plugins/wobbly/wobbly-signal.hpp>
 
 extern "C"
 {

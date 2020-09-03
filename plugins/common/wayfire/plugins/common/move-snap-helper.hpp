@@ -2,8 +2,8 @@
 
 #include <wayfire/view.hpp>
 #include <wayfire/core.hpp>
-#include "../wobbly/wobbly-signal.hpp"
 #include <wayfire/option-wrapper.hpp>
+#include <wayfire/plugins/wobbly/wobbly-signal.hpp>
 
 namespace wf
 {

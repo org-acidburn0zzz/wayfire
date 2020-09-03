@@ -5,11 +5,10 @@
 #include <wayfire/plugins/common/view-change-viewport-signal.hpp>
 #include <wayfire/plugins/common/workspace-wall.hpp>
 #include <wayfire/plugins/common/geometry-animation.hpp>
+#include <wayfire/plugins/common/move-snap-helper.hpp>
 
 /* TODO: this file should be included in some header maybe(plugin.hpp) */
 #include <linux/input-event-codes.h>
-#include "../wobbly/wobbly-signal.hpp"
-#include "move-snap-helper.hpp"
 
 static bool begins_with(std::string word, std::string prefix)
 {
