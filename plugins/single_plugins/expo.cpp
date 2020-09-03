@@ -225,7 +225,7 @@ class wayfire_expo : public wf::plugin_interface_t
 
         // assume input was pressed, otherwise, move request doesn't make sense
         this->state.button_pressed = true;
-        this->input_grab_origin = offscreen_point;
+        this->input_grab_origin    = offscreen_point;
 
         start_move(view, {(int)input.x, (int)input.y});
     };
@@ -237,8 +237,8 @@ class wayfire_expo : public wf::plugin_interface_t
     bool can_start_move(wayfire_view view)
     {
         return view != nullptr &&
-            output->is_plugin_active(grab_interface->name) &&
-            this->moving_view == nullptr;
+               output->is_plugin_active(grab_interface->name) &&
+               this->moving_view == nullptr;
     }
 
     wf::signal_connection_t on_view_check_move = [=] (wf::signal_data_t *data)
@@ -402,6 +402,7 @@ class wayfire_expo : public wf::plugin_interface_t
                 auto moving_view_copy = moving_view;
                 this->moving_view = nullptr;
                 start_move_on_output(moving_view_copy, target_output);
+
                 return;
             }
 
