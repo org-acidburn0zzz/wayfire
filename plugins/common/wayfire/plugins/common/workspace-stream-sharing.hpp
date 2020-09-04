@@ -23,17 +23,18 @@ class workspace_stream_pool_t : public noncopyable_t, public wf::custom_data_t
      * Make sure there is a stream pool object on the given output, and
      * increase its reference count.
      */
-    static nonstd::observer_ptr<workspace_stream_pool_t>
-    ensure_pool(wf::output_t *output)
+    static nonstd::observer_ptr<workspace_stream_pool_t> ensure_pool(
+        wf::output_t *output)
     {
         if (!output->has_data<workspace_stream_pool_t>())
         {
             output->store_data(std::unique_ptr<workspace_stream_pool_t>(
-                    new workspace_stream_pool_t(output)));
+                new workspace_stream_pool_t(output)));
         }
 
         auto pool = output->get_data<workspace_stream_pool_t>();
         ++pool->ref_count;
+
         return pool;
     }
 
@@ -124,5 +125,4 @@ class workspace_stream_pool_t : public noncopyable_t, public wf::custom_data_t
     wf::output_t *output;
     std::vector<std::vector<wf::workspace_stream_t>> streams;
 };
-
 }
