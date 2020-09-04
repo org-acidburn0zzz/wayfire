@@ -6,6 +6,8 @@
 #include <wayfire/render-manager.hpp>
 #include <wayfire/workspace-manager.hpp>
 
+#include <wayfire/plugins/common/workspace-stream-sharing.hpp>
+
 #include <glm/gtc/matrix_transform.hpp>
 #include <wayfire/img.hpp>
 
@@ -37,7 +39,7 @@ class wayfire_cube : public wf::plugin_interface_t
     /* Used to restore the pointer where the grab started */
     wf::pointf_t saved_pointer_position;
 
-    std::vector<wf::workspace_stream_t> streams;
+    nonstd::observer_ptr<wf::workspace_stream_pool_t> streams;
 
     wf::option_wrapper_t<double> XVelocity{"cube/speed_spin_horiz"},
     YVelocity{"cube/speed_spin_vert"}, ZVelocity{"cube/speed_zoom"};
@@ -89,6 +91,11 @@ class wayfire_cube : public wf::plugin_interface_t
     }
 
     bool tessellation_support;
+
+    int get_num_faces()
+    {
+        return output->workspace->get_workspace_grid_size().width;
+    }
 
   public:
     void init() override
@@ -213,8 +220,7 @@ class wayfire_cube : public wf::plugin_interface_t
 #endif
         }
 
-        auto wsize = output->workspace->get_workspace_grid_size();
-        streams.resize(wsize.width);
+        streams = wf::workspace_stream_pool_t::ensure_pool(output);
         animation.projection = glm::perspective(45.0f, 1.f, 0.1f, 100.f);
     }
 
@@ -295,7 +301,7 @@ class wayfire_cube : public wf::plugin_interface_t
         output->deactivate_plugin(grab_interface);
 
         /* Figure out how much we have rotated and switch workspace */
-        int size = streams.size();
+        int size = get_num_faces();
         int dvx  = calculate_viewport_dx_from_rotation();
 
         auto cws = output->workspace->get_current_workspace();
@@ -306,9 +312,9 @@ class wayfire_cube : public wf::plugin_interface_t
          * it is properly reset */
         animation.cube_animation.rotation.set(0, 0);
 
-        for (auto& stream : streams)
+        for (int i = 0; i < size; i++)
         {
-            output->render->workspace_stream_stop(stream);
+            streams->stop({i, cws.y});
         }
     }
 
@@ -431,16 +437,9 @@ class wayfire_cube : public wf::plugin_interface_t
     void update_workspace_streams()
     {
         auto cws = output->workspace->get_current_workspace();
-        for (size_t i = 0; i < streams.size(); i++)
+        for (int i = 0; i < get_num_faces(); i++)
         {
-            if (!streams[i].running)
-            {
-                streams[i].ws = {(int)i, cws.y};
-                output->render->workspace_stream_start(streams[i]);
-            } else
-            {
-                output->render->workspace_stream_update(streams[i]);
-            }
+            streams->update({i, cws.y});
         }
     }
 
@@ -474,10 +473,11 @@ class wayfire_cube : public wf::plugin_interface_t
         static const GLuint indexData[] = {0, 1, 2, 0, 2, 3};
 
         auto cws = output->workspace->get_current_workspace();
-        for (size_t i = 0; i < streams.size(); i++)
+        for (int i = 0; i < get_num_faces(); i++)
         {
-            int index = (cws.x + i) % streams.size();
-            GL_CALL(glBindTexture(GL_TEXTURE_2D, streams[index].buffer.tex));
+            int index = (cws.x + i) % get_num_faces();
+            GL_CALL(glBindTexture(GL_TEXTURE_2D,
+                streams->get({index, cws.y}).buffer.tex));
 
             auto model = calculate_model_matrix(i, fb_transform);
             program.uniformMatrix4f("model", model);
@@ -633,12 +633,9 @@ class wayfire_cube : public wf::plugin_interface_t
             deactivate();
         }
 
-        OpenGL::render_begin();
-        for (size_t i = 0; i < streams.size(); i++)
-        {
-            streams[i].buffer.release();
-        }
+        streams->unref();
 
+        OpenGL::render_begin();
         program.free_resources();
         OpenGL::render_end();
 

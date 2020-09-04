@@ -1,13 +1,8 @@
 #pragma once
 
-#include <wayfire/object.hpp>
-#include <wayfire/output.hpp>
-#include <wayfire/geometry.hpp>
-#include <wayfire/render-manager.hpp>
-#include <wayfire/workspace-stream.hpp>
-#include <wayfire/workspace-manager.hpp>
 
 #include <glm/gtc/matrix_transform.hpp>
+#include "workspace-stream-sharing.hpp"
 
 namespace wf
 {
@@ -36,33 +31,13 @@ class workspace_wall_t : public wf::signal_provider_t
     workspace_wall_t(wf::output_t *_output) : output(_output)
     {
         this->viewport = get_wall_rectangle();
-
-        auto wsize = this->output->workspace->get_workspace_grid_size();
-        this->streams.resize(wsize.width);
-        for (int i = 0; i < wsize.width; i++)
-        {
-            this->streams[i].resize(wsize.height);
-            for (int j = 0; j < wsize.height; j++)
-            {
-                this->streams[i][j].ws = {i, j};
-            }
-        }
+        streams = workspace_stream_pool_t::ensure_pool(output);
     }
 
     ~workspace_wall_t()
     {
         stop_output_renderer(false);
-
-        OpenGL::render_begin();
-        for (auto& row : this->streams)
-        {
-            for (auto& stream : row)
-            {
-                stream.buffer.release();
-            }
-        }
-
-        OpenGL::render_end();
+        streams->unref();
     }
 
     /**
@@ -111,7 +86,7 @@ class workspace_wall_t : public wf::signal_provider_t
                 [&] (auto neww) { return neww == old; });
             if (it == newly_visible.end())
             {
-                output->render->workspace_stream_stop(streams[old.x][old.y]);
+                streams->stop(old);
             }
         }
 
@@ -142,7 +117,7 @@ class workspace_wall_t : public wf::signal_provider_t
         {
             auto ws_matrix = calculate_workspace_matrix(ws);
             OpenGL::render_transformed_texture(
-                this->streams[ws.x][ws.y].buffer.tex, workspace_geometry,
+                streams->get(ws).buffer.tex, workspace_geometry,
                 fb.get_orthographic_projection() * wall_matrix * ws_matrix);
         }
 
@@ -226,20 +201,14 @@ class workspace_wall_t : public wf::signal_provider_t
     int gap_size = 0;
 
     wf::geometry_t viewport = {0, 0, 0, 0};
-    std::vector<std::vector<wf::workspace_stream_t>> streams;
+    nonstd::observer_ptr<workspace_stream_pool_t> streams;
+
     /** Update or start visible streams */
     void update_streams()
     {
         for (auto& ws : get_visible_workspaces(viewport))
         {
-            auto& stream = streams[ws.x][ws.y];
-            if (stream.running)
-            {
-                output->render->workspace_stream_update(stream);
-            } else
-            {
-                output->render->workspace_stream_start(stream);
-            }
+            streams->update(ws);
         }
     }
 
