@@ -79,6 +79,7 @@ class wayfire_scale : public wf::plugin_interface_t
     int grid_cols;
     int grid_rows;
     int grid_last_row_cols;
+    wf::point_t initial_workspace;
     bool input_release_impending = false;
     bool active, hook_set, button_connected;
     const std::string transformer_name = "scale";
@@ -431,6 +432,7 @@ class wayfire_scale : public wf::plugin_interface_t
 
         /* end scale */
         input_release_impending = true;
+        initial_focus_view = nullptr;
         deactivate();
         select_view(view);
     }
@@ -505,6 +507,8 @@ class wayfire_scale : public wf::plugin_interface_t
             return;
         }
 
+        auto v = initial_focus_view;
+
         switch (key)
         {
           case KEY_UP:
@@ -532,9 +536,10 @@ class wayfire_scale : public wf::plugin_interface_t
 
           case KEY_ESC:
             input_release_impending = true;
+            initial_focus_view = nullptr;
             deactivate();
-            output->focus_view(initial_focus_view, true);
-            select_view(initial_focus_view);
+            output->focus_view(v, true);
+            output->workspace->request_workspace(initial_workspace);
 
             return;
 
@@ -1176,6 +1181,19 @@ class wayfire_scale : public wf::plugin_interface_t
 
     void refocus()
     {
+        if (!initial_focus_view)
+        {
+            return;
+        }
+
+        if (last_focused_view)
+        {
+            output->focus_view(last_focused_view, true);
+            select_view(last_focused_view);
+
+            return;
+        }
+
         wayfire_view next_focus = nullptr;
         auto views = get_current_workspace_views();
 
@@ -1262,6 +1280,7 @@ class wayfire_scale : public wf::plugin_interface_t
             return false;
         }
 
+        initial_workspace  = output->workspace->get_current_workspace();
         initial_focus_view = output->get_active_view();
         if (!interact)
         {
