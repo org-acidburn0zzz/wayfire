@@ -1409,7 +1409,6 @@ class wayfire_scale : public wf::plugin_interface_t
         finalize();
         output->rem_binding(&toggle_cb);
         output->rem_binding(&toggle_all_cb);
-        output->deactivate_plugin(grab_interface);
     }
 };
 
